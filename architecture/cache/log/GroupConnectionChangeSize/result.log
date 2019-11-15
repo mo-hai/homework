@@ -1,0 +1,25 @@
+GroupConnectionChangeSize perlbench for 8 block size, the hit rate is 0.979288232523584
+GroupConnectionChangeSize bzip2 for 8 block size, the hit rate is 0.987829514025351
+GroupConnectionChangeSize mcf for 8 block size, the hit rate is 0.9542406933228285
+GroupConnectionChangeSize astar for 8 block size, the hit rate is 0.7672094729873092
+
+GroupConnectionChangeSize perlbench for 16 block size, the hit rate is 0.9846701389915281
+GroupConnectionChangeSize bzip2 for 16 block size, the hit rate is 0.9939009832621384
+GroupConnectionChangeSize mcf for 16 block size, the hit rate is 0.9669686822926925
+GroupConnectionChangeSize astar for 16 block size, the hit rate is 0.8120518158686097
+
+GroupConnectionChangeSize perlbench for 32 block size, the hit rate is 0.988643014655891
+GroupConnectionChangeSize bzip2 for 32 block size, the hit rate is 0.996936717880532
+GroupConnectionChangeSize mcf for 32 block size, the hit rate is 0.9817549734094938
+GroupConnectionChangeSize astar for 32 block size, the hit rate is 0.9037007346430879
+
+GroupConnectionChangeSize perlbench for 64 block size, the hit rate is 0.9914689589528635
+GroupConnectionChangeSize bzip2 for 64 block size, the hit rate is 0.9984555034397646
+GroupConnectionChangeSize mcf for 64 block size, the hit rate is 0.9891628914713413
+GroupConnectionChangeSize astar for 64 block size, the hit rate is 0.9499010903985897
+
+GroupConnectionChangeSize perlbench for 128 block size, the hit rate is 0.9931479718824454
+GroupConnectionChangeSize bzip2 for 128 block size, the hit rate is 0.99921948746956
+GroupConnectionChangeSize mcf for 128 block size, the hit rate is 0.9945519007287769
+GroupConnectionChangeSize astar for 128 block size, the hit rate is 0.9734539392344078
+

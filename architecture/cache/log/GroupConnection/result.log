@@ -1,0 +1,20 @@
+GroupConnection perlbench for 2 ways prediction group connection the hit rate is 0.9691786828419462
+GroupConnection bzip2 for 2 ways prediction group connection the hit rate is 0.9877799285234172
+GroupConnection mcf for 2 ways prediction group connection the hit rate is 0.954228875320071
+GroupConnection astar for 2 ways prediction group connection the hit rate is 0.7672972153756571
+
+GroupConnection perlbench for 4 ways prediction group connection the hit rate is 0.979288232523584
+GroupConnection bzip2 for 4 ways prediction group connection the hit rate is 0.987829514025351
+GroupConnection mcf for 4 ways prediction group connection the hit rate is 0.9542406933228285
+GroupConnection astar for 4 ways prediction group connection the hit rate is 0.7672094729873092
+
+GroupConnection perlbench for 8 ways prediction group connection the hit rate is 0.982098411440936
+GroupConnection bzip2 for 8 ways prediction group connection the hit rate is 0.987829514025351
+GroupConnection mcf for 8 ways prediction group connection the hit rate is 0.9542406933228285
+GroupConnection astar for 8 ways prediction group connection the hit rate is 0.7671516427768073
+
+GroupConnection perlbench for 16 ways prediction group connection the hit rate is 0.9824551031548495
+GroupConnection bzip2 for 16 ways prediction group connection the hit rate is 0.987829514025351
+GroupConnection mcf for 16 ways prediction group connection the hit rate is 0.9542406933228285
+GroupConnection astar for 16 ways prediction group connection the hit rate is 0.767095806711495
+

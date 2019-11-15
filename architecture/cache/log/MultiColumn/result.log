@@ -1,0 +1,20 @@
+MultiColumn prediction perlbench for 2 ways group connection the hit rate is 0.9691786828419462 first hit rate is 0.9594672089957256 no first hit rate is 0.009711473846220545
+MultiColumn prediction bzip2 for 2 ways group connection the hit rate is 0.9877799285234172 first hit rate is 0.9793852866960262 no first hit rate is 0.008394641827391032
+MultiColumn prediction mcf for 2 ways group connection the hit rate is 0.954228875320071 first hit rate is 0.9505534764624778 no first hit rate is 0.0036753988575930667
+MultiColumn prediction astar for 2 ways group connection the hit rate is 0.7672972153756571 first hit rate is 0.7658634249842462 no first hit rate is 0.001433790391410818
+
+MultiColumn prediction perlbench for 4 ways group connection the hit rate is 0.9787620629787502 first hit rate is 0.9621059394097048 no first hit rate is 0.016656123569045465
+MultiColumn prediction bzip2 for 4 ways group connection the hit rate is 0.987829514025351 first hit rate is 0.9793852866960262 no first hit rate is 0.008444227329324866
+MultiColumn prediction mcf for 4 ways group connection the hit rate is 0.9542367539885759 first hit rate is 0.9505534764624778 no first hit rate is 0.0036832775260980896
+MultiColumn prediction astar for 4 ways group connection the hit rate is 0.7671576252123765 first hit rate is 0.7656101685451514 no first hit rate is 0.0015474566672250274
+
+MultiColumn prediction perlbench for 8 ways group connection the hit rate is 0.9814224707897076 first hit rate is 0.9630715689114596 no first hit rate is 0.018350901878247915
+MultiColumn prediction bzip2 for 8 ways group connection the hit rate is 0.987829514025351 first hit rate is 0.9793852866960262 no first hit rate is 0.008444227329324866
+MultiColumn prediction mcf for 8 ways group connection the hit rate is 0.9542347843214497 first hit rate is 0.9505534764624778 no first hit rate is 0.0036813078589718337
+MultiColumn prediction astar for 8 ways group connection the hit rate is 0.7670639003884595 first hit rate is 0.7655224261568037 no first hit rate is 0.0015414742316558585
+
+MultiColumn prediction perlbench for 16 ways group connection the hit rate is 0.9820905287511258 first hit rate is 0.9633100202782195 no first hit rate is 0.01878050847290621
+MultiColumn prediction bzip2 for 16 ways group connection the hit rate is 0.987829514025351 first hit rate is 0.9793852866960262 no first hit rate is 0.008444227329324866
+MultiColumn prediction mcf for 16 ways group connection the hit rate is 0.9542367539885759 first hit rate is 0.9505534764624778 no first hit rate is 0.0036832775260980896
+MultiColumn prediction astar for 16 ways group connection the hit rate is 0.7669861287260603 first hit rate is 0.7654665900914914 no first hit rate is 0.0015195386345689056
+

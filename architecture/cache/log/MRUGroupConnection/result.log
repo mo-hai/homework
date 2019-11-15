@@ -1,0 +1,20 @@
+MRU prediction GroupConnection perlbench for 2 ways MRU prediction group connection the hit rate is 0.9691786828419462 first hit rate is 0.9338445257675276 no first hit rate is 0.035334157074418504
+MRU prediction GroupConnection bzip2 for 2 ways MRU prediction group connection the hit rate is 0.9877799285234172 first hit rate is 0.9788031161733215 no first hit rate is 0.008976812350095682
+MRU prediction GroupConnection mcf for 2 ways MRU prediction group connection the hit rate is 0.954228875320071 first hit rate is 0.9501280283632066 no first hit rate is 0.00410084695686429
+MRU prediction GroupConnection astar for 2 ways MRU prediction group connection the hit rate is 0.7672972153756571 first hit rate is 0.7643737985275232 no first hit rate is 0.002923416848133879
+
+MRU prediction GroupConnection perlbench for 4 ways MRU prediction group connection the hit rate is 0.979288232523584 first hit rate is 0.9044775648794638 no first hit rate is 0.0748106676441202
+MRU prediction GroupConnection bzip2 for 4 ways MRU prediction group connection the hit rate is 0.987829514025351 first hit rate is 0.9773394256162375 no first hit rate is 0.010490088409113448
+MRU prediction GroupConnection mcf for 4 ways MRU prediction group connection the hit rate is 0.9542406933228285 first hit rate is 0.9459188497143982 no first hit rate is 0.008321843608430175
+MRU prediction GroupConnection astar for 4 ways MRU prediction group connection the hit rate is 0.7672094729873092 first hit rate is 0.7624115596608357 no first hit rate is 0.004797913326473474
+
+MRU prediction GroupConnection perlbench for 8 ways MRU prediction group connection the hit rate is 0.982098411440936 first hit rate is 0.8739952033832504 no first hit rate is 0.10810320805768553
+MRU prediction GroupConnection bzip2 for 8 ways MRU prediction group connection the hit rate is 0.987829514025351 first hit rate is 0.9708510708631918 no first hit rate is 0.016978443162159282
+MRU prediction GroupConnection mcf for 8 ways MRU prediction group connection the hit rate is 0.9542406933228285 first hit rate is 0.9303565097498523 no first hit rate is 0.023884183572976166
+MRU prediction GroupConnection astar for 8 ways MRU prediction group connection the hit rate is 0.7671516427768073 first hit rate is 0.7597094929287611 no first hit rate is 0.007442149848046136
+
+MRU prediction GroupConnection perlbench for 16 ways MRU prediction group connection the hit rate is 0.9824551031548495 first hit rate is 0.8312375231800347 no first hit rate is 0.1512175799748148
+MRU prediction GroupConnection bzip2 for 16 ways MRU prediction group connection the hit rate is 0.987829514025351 first hit rate is 0.9679953132518172 no first hit rate is 0.01983420077353383
+MRU prediction GroupConnection mcf for 16 ways MRU prediction group connection the hit rate is 0.9542406933228285 first hit rate is 0.9074354934016151 no first hit rate is 0.04680519992121331
+MRU prediction GroupConnection astar for 16 ways MRU prediction group connection the hit rate is 0.767095806711495 first hit rate is 0.7528695749280113 no first hit rate is 0.014226231783483692
+
