@@ -7,6 +7,7 @@ cache replacement algorithm : LRU
 
 import numpy as np
 import os
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 ADDRESS = 64
 BLOCK = 1 << 14
@@ -77,7 +78,6 @@ class DirectMapping:
                     result_log.write("DirectMapping " + name + " hit rate is " + str(self.getHitRate()) + "\n")
                     print(name, self.getHitRate())
         print()
-
 
     def LRU(self, index):
         return
@@ -247,13 +247,13 @@ class GroupConnectionChangeSize:
                             if not hit_flag:
                                 save(log, line.split()[1], "miss")
                                 self.miss(tag, 0, offset, group)
-                        result_log.write("GroupConnectionChangeSize " + name + " for " + str(1 << size) + " block size, the hit rate is " + str(
+                        result_log.write("GroupConnectionChangeSize " + name + " for " + str(
+                            1 << size) + " block size, the hit rate is " + str(
                             self.getHitRate()) + "\n")
                         print(name, "for", 1 << size, " block size, the hit rate is", self.getHitRate())
                 result_log.write("\n")
                 print()
         print()
-
 
     def LRU(self, index, group, state):
         flag = False
@@ -299,6 +299,7 @@ class GroupConnectionChangeSize:
     def getHitRate(self):
         hit_rate = self.hit_num / self.total
         return hit_rate
+
 
 class MRUGroupConnection:
     def __init__(self):
@@ -463,14 +464,15 @@ class MultiColumn:
                             tag = int(addr[0:47 + self.index_offset], 2)
                             group = int(addr[47 + self.index_offset:61], 2)
                             offset = int(addr[61:], 2)
-                            
+
                             select_location = int(bin(tag)[-self.index_offset:], 2)
                             if self.cache[group * self.group_size + select_location][0] == tag:  # 根据tag后几位直接命中，则为一次命中
                                 self.first_hit += 1
                                 self.hit(select_location, group)  # 在主位上命中，不需要交换，跟新LRU即可
                                 continue
 
-                            str_location = bin(self.cache[group * self.group_size + select_location][3])[2:].rjust(self.group_size, '0')
+                            str_location = bin(self.cache[group * self.group_size + select_location][3])[2:].rjust(
+                                self.group_size, '0')
                             hit_flag = False
                             for i in range(self.group_size):
                                 if str_location[i] == '1':
@@ -479,7 +481,8 @@ class MultiColumn:
                                         self.no_first_hit += 1
                                         hit_flag = True
                                         self.hit(i, group)
-                                        self.swapTag(group * self.group_size + i, group * self.group_size + select_location)
+                                        self.swapTag(group * self.group_size + i,
+                                                     group * self.group_size + select_location)
                                         break
                             if not hit_flag:
                                 """
@@ -490,7 +493,8 @@ class MultiColumn:
                                 replacement = self.miss(tag, self.index_offset, offset, group)
                                 str_location = str_location[:replacement] + '1' + str_location[replacement + 1:]
                                 self.cache[group * self.group_size + select_location][3] = int(str_location, 2)
-                                self.swapTag(group * self.group_size + select_location, group * self.group_size + replacement)
+                                self.swapTag(group * self.group_size + select_location,
+                                             group * self.group_size + replacement)
 
                         hit_rate = self.getHitRate()
                         result_log.write("MultiColumn prediction " + name + " for " + str(self.group_size) +
@@ -538,7 +542,6 @@ class MultiColumn:
                 lru_result = max_index
         return lru_result
 
-
     def hit(self, index, group):
         self.hit_num += 1
         self.LRU(index, group, False)
@@ -556,7 +559,6 @@ class MultiColumn:
         str_location = str_location[:index_in] + '0' + str_location[index_in + 1:]
         self.cache[group * self.group_size + select_location][3] = int(str_location, 2)  # 跟新被替换元素的主位上的候选位
 
-
         if index_in < self.group_size:
             self.cache[group * self.group_size + index_in][0] = tag  # 根据LRU算法跟新tag
             self.cache[group * self.group_size + index_in][1] = offset
@@ -570,8 +572,6 @@ class MultiColumn:
         return hit_rate, first_hit_rate, no_first_hit_rate
 
 
-
-
 if __name__ == '__main__':
     des_folder = DESTINATION
     if not os.path.exists(des_folder):
@@ -579,16 +579,17 @@ if __name__ == '__main__':
     n = input("0:全部执行\n1：执行第一题\n2：执行第二题\n3：执行第三题\n4：执行第四题\n5:执行问题六\n")
     n = int(n)
     if n == 0:
-        print("DirectMapping:")
-        DirectMapping().run()
-        print("GroupConnection:")
-        GroupConnection().run()
-        print("MRUGroupConnection:")
-        MRUGroupConnection().run()
-        print("MultiColumn:")
-        MultiColumn().run()
-        print("GroupConnectionChangeSize")
-        GroupConnectionChangeSize().run()
+        with ProcessPoolExecutor(max_work=5) as process_pool:
+            print("DirectMapping:")
+            process_pool.submit(DirectMapping().run)
+            print("GroupConnection:")
+            process_pool.submit(GroupConnection().run)
+            print("MRUGroupConnection:")
+            process_pool.submit(MRUGroupConnection().run)
+            print("MultiColumn:")
+            process_pool.submit(MultiColumn().run)
+            print("GroupConnectionChangeSize")
+            process_pool.submit(GroupConnectionChangeSize().run)
     elif n == 1:
         print("DirectMapping:")
         DirectMapping().run()
