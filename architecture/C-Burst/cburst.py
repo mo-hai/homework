@@ -85,7 +85,6 @@ class LRUOnly(CBurst):
         self.cache = []
         self.hit = 0.0
         self.miss = 0.0
-        self.total = 0.0
 
     def isHit(self, index):  # 判断是否命中
         hit_flag = False
@@ -93,8 +92,9 @@ class LRUOnly(CBurst):
         for i in range(len(self.cache)):
             if self.cache[i] == 0:
                 break
-            if index == self.cache[i]:
+            elif index == self.cache[i]:
                 line = i
+                hit_flag = True
                 break
         if hit_flag:
             return line
@@ -121,7 +121,7 @@ class LRUOnly(CBurst):
                 if (float(line[0]) - min_time) < 0:
                     min_time = float(line[0])
                     current_line = i
-            print(current_lines[current_line])
+            print(current_lines[current_line], self.hit, self.miss, len(self.cache))
             line = current_lines[current_line].strip().split(',')
             addr = line[4]  # 获取本次处理的地址
             block_num = int(line[5]) // (1 << 12) + 1  # 本次处理的块数
@@ -131,18 +131,18 @@ class LRUOnly(CBurst):
                 hit_index = self.isHit(block_indexs[i])
                 if hit_index != -1:
                     self.hit += 1
-                    hit_line = self.cache.pop[hit_index]
+                    # hit_line = self.cache[hit_index]
+                    hit_line = self.cache.pop(hit_index)
                     self.cache.append(hit_line)
                     hit_flag[i] = True
             for i in range(block_num):  # 缺失处理
-                # print("miss", block_indexs)
                 if not hit_flag[i]:
                     self.miss += 1
-                    if len(self.cache) <= BLOCK_NUM:
+                    if len(self.cache) < BLOCK_NUM:
                         self.cache.append(block_indexs[i])
                     else:
-                        self.cache.pop(0)
-                        self.cache.append(block_indexs[i])
+                        line = self.cache.pop(0)
+                        self.cache.append(line)
             current_lines[current_line] = "0"
 
         super().closeFile(file_list)
