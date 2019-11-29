@@ -8,6 +8,7 @@
 
 import numpy as np
 import os
+from concurrent.futures import ProcessPoolExecutor
 import queue
 import datetime, time
 
@@ -25,17 +26,10 @@ class CBurst:
         self.source_path = source
         self.destination_path = destination
         des_folder = source
-        if not os.path.exists(des_folder):
-            os.makedirs(des_folder)
 
-    def saveLog(self, fp, addr, state):
-        """
-        :param fp:保存文件的指针
-        :param addr: miss的地址
-        :param state: miss或者hit 字符串类型
-        :return:
-        """
-        fp.write(addr + " " + state + "\n")
+
+    def saveLog(self, fp, content):
+        fp.write(content)
         return
 
     def fileLists(self):
@@ -60,60 +54,55 @@ class CBurst:
         for i in range(len(fp)):
             fp[i].close()
 
-    def getBlockTag(self, dec, block_num):
+    def getBlockTag(self, dec, block_size):
         """
         :param dec:10进制字符串
         :param block_num:块个数
         :return: 块tag
         """
         result = []
-        temp = int(dec, 10)
-        temp = temp >> 12
-        temp = temp << 12
-        result.append(temp)
+        begin_addr = int(dec, 10)
+        block_num = int(np.ceil(block_size / 4096))
+        if begin_addr % 4096 != 0:
+            end_addr = begin_addr + block_size
+            begin_addr = begin_addr >> 12
+            begin_addr = begin_addr << 12
+            block_num = int(np.ceil((end_addr - begin_addr) / 4096))
+        result.append(begin_addr)
         for i in range(1, block_num):
-            temp = temp + (1 << 12)
-            result.append(temp)
-        return result
+            begin_addr = begin_addr + (1 << 12)
+            result.append(begin_addr)
+        return result, block_num
 
 
 class LRUOnly(CBurst):
     def __init__(self, source, destination):
         super().__init__(source, destination)
         self.path = source
-        self.path = destination
-        self.cache = []
+        self.despath = destination + "/LRU/"
+        self.cache_tag = {}
+        self.cache_index = {}
         self.hit = 0.0
         self.miss = 0.0
         self.total = 0.0
 
-    def isHit(self, index):  # 判断是否命中
-        hit_flag = False
-        line = 0
-        for i in range(len(self.cache) - 1, -1, -1):
-            if self.cache[i] == 0:
-                break
-            elif index == self.cache[i]:
-                line = i
-                hit_flag = True
-                break
-        if hit_flag:
-            return line
-        else:
-            return -1
 
     def run(self):
+        if not os.path.exists(self.despath):
+            os.makedirs(self.despath)
+        w = open(self.despath + "miss.log", "w+")
         file_list = super().fileLists()
         current_lines = ["0" for _ in range(len(file_list))]
         # finish_flags = [False for _ in range(len(file_list))]
-
+        t1 = time.process_time()
         while True:
-            self.total += 1
             for i in range(len(current_lines)):  # current_lines 保存的是每个文件顶部的行
                 if current_lines[i] == "0":
                     current_lines[i] = file_list[i].readline()
                 elif current_lines[i] == "":
                     current_lines.pop(i)
+            if current_lines[0] == "":
+                current_lines.pop(0)
             if len(set(current_lines)) == 0:
                 break
             current_line = 0
@@ -125,31 +114,49 @@ class LRUOnly(CBurst):
                     current_line = i
             line = current_lines[current_line].strip().split(',')
             addr = line[4]  # 获取本次处理的地址
-            block_num = int(line[5]) // (1 << 12) + 1  # 本次处理的块数
-            block_indexs = super().getBlockTag(addr, block_num)
+            block_indexes, block_num = super().getBlockTag(addr, int(line[5]))
             hit_flag = [False for _ in range(block_num)]
-            for i in range(block_num):  # 命中检测
-                if block_indexs[i] in self.cache:
-                    self.hit += 1
-                    self.cache.remove(block_indexs[i])
-                    self.cache.append(block_indexs[i])
-                    hit_flag[i] = True
 
+            for i in range(block_num):  # 命中检测
+                if self.cache_tag.__contains__(block_indexes[i]):
+                    t = time.process_time()
+                    index = self.cache_tag[block_indexes[i]]
+                    self.cache_tag.pop(block_indexes[i])
+                    self.cache_index.pop(index)
+                    self.cache_index[t] = block_indexes[i]
+                    self.cache_tag[block_indexes[i]] = t
+                    hit_flag[i] = True
+            if all(set(hit_flag)):
+                self.hit += 1
+                # super().saveLog(w, "hit " + current_lines[current_line])
+            else:
+                super().saveLog(w, "miss " + current_lines[current_line])
+                self.miss += 1
             for i in range(block_num):  # 缺失处理
                 if not hit_flag[i]:
-                    self.miss += 1
-                    if len(self.cache) < BLOCK_NUM:
-                        self.cache.append(block_indexs[i])
+                    if len(self.cache_tag) < BLOCK_NUM:
+                        t = time.process_time()
+                        self.cache_index[t] = block_indexes[i]
+                        self.cache_tag[block_indexes[i]] = t
                     else:
-                        self.cache.pop(0)
-                        self.cache.append(block_indexs[i])
-            if self.total % 5000 == 0:
-                print(current_lines[current_line], self.hit, self.miss, len(self.cache), self.total, "\naccuracy：",
-                      self.hit / (self.hit + self.miss), time.time())
+                        t = time.process_time()
+                        tag = list(self.cache_tag)[0]
+                        index = self.cache_tag[tag]
+                        self.cache_tag.pop(tag)
+                        self.cache_index.pop(index)
+                        self.cache_tag[block_indexes[i]] = t
+                        self.cache_index[t] = block_indexes
+            self.total += 1
+            if self.total % 50000 == 0:
+                print(current_lines[current_line], self.hit, self.miss, len(self.cache_tag), self.total, "\naccuracy：",
+                      self.hit / self.total, time.process_time() - t1)
+                t1 = time.process_time()
             current_lines[current_line] = "0"
 
         super().closeFile(file_list)
+        w.close()
         print(self.hit / (self.miss + self.hit))
+        print(self.hit, self.total)
         # block_group = []
         # block_group_info = []
         # blocks = []
@@ -164,7 +171,26 @@ class LRUOnly(CBurst):
 
         # print(lines)
 
+class CBustOnly(CBurst):
+    def __init__(self, source, destination):
+        super().__init__(source, destination)
+        self.path = source
+        self.path = destination
+        self.cache = []
+        self.cache_tag = {}
+        self.cache_index = {}
+        self.hit = 0.0
+        self.miss = 0.0
+        self.total = 0.0
+
+    def run(self):
+        file_list = super().fileLists()
+
+
+
 
 if __name__ == '__main__':
+    if not os.path.exists(DESTINATION_PATH):
+        os.makedirs(DESTINATION_PATH)
     test = LRUOnly(SOURCE_PATH, DESTINATION_PATH)
     test.run()
