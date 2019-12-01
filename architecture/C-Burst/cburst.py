@@ -140,7 +140,7 @@ class LRUOnly(CBurst):
             self.total += 1
             if self.total % 10000 == 0:
                 print(current_lines[current_line], self.hit, self.miss, len(self.cache_tag), self.total, "\nmiss rate：",
-                      self.miss / (self.miss + self.total), time.process_time() - t1)
+                      self.miss / (self.miss + self.hit), time.process_time() - t1)
                 t1 = time.process_time()
             current_lines[current_line] = "0"
 
