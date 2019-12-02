@@ -13,7 +13,7 @@ import time
 
 SOURCE_PATH = os.environ['HOME'] + "/data/trace/CBursty/"
 
-DESTINATION_PATH = "log1"
+DESTINATION_PATH = "log2"
 
 EPOCH = 10 ** 8
 LEVEL = 16
@@ -136,8 +136,6 @@ class LRUOnly(CBurst):
             if not hit_flag:
                 super().saveLog(w, "miss " + current_lines[current_line])
 
-
-
             self.total += 1
             if self.total % 50000 == 0:
                 print(current_lines[current_line], self.hit, self.miss, len(self.cache_tag), self.total, "\naccuracy：",
@@ -150,8 +148,8 @@ class LRUOnly(CBurst):
         print(self.hit / (self.miss + self.hit))
         print(self.hit, self.total)
         with open(self.des_path + "result.log", "w+") as result_log:
-            result_log.write("accuracy: " + str(self.hit / (self.miss + self.total)) + "\nhit_num: " + str(self.hit) +
-                            "\nmiss_num: " + str(self.miss) + "\n lines: " + str(self.total) + "\n")
+            result_log.write("accuracy: " + str(self.hit / (self.miss + self.hit)) + "\nhit_num: " + str(self.hit) +
+                             "\nmiss_num: " + str(self.miss) + "\n lines: " + str(self.total) + "\n")
 
 
 class CBustOnly(CBurst):
@@ -160,6 +158,7 @@ class CBustOnly(CBurst):
         self.path = source
         self.des_path = destination + "/CBurst/"
         self.block_group = [[] for _ in range(LEVEL)]
+        self.buffer_dict = {'hm': 0, 'prxy': 1}
         self.blocks = []
         self.groups_size = 0
         self.blocks_size = 0
@@ -170,9 +169,11 @@ class CBustOnly(CBurst):
     def checkHit(self, line):
         tag, block_num = super().getBlockTag(line[4], line[5])
         hit_flag = [False for _ in range(block_num)]
-
+        if len(self.blocks[0]) + len(self.blocks[1]) != self.blocks_size:
+            print("size error")
+            exit(0)
         for i in range(block_num):  # in_buffer 中寻找
-            if tag + i in self.blocks:
+            if tag + i in self.blocks[self.buffer_dict[line[1]]]:
                 hit_flag[i] = True
 
         for i in range(block_num):  # 冷块中寻找
@@ -188,9 +189,11 @@ class CBustOnly(CBurst):
                             self.block_group[row][col].remove(tag + i)
                             if len(self.block_group[row][col]) == 0:
                                 remove_col.append(col)
-                            if len(self.block_group[row][col]) > 0 and int(np.log2(len(self.block_group[row][col]))) < row:
+                            if len(self.block_group[row][col]) > 0 and int(
+                                    np.log2(len(self.block_group[row][col]))) < row:
                                 level_down.append(col)
-                            self.blocks.append(tag + i)
+                            self.blocks[self.buffer_dict[line[1]]].append(tag + i)
+                            self.blocks_size += 1
                             self.groups_size -= 1
                             hit_flag[i] = True
                             break
@@ -202,13 +205,14 @@ class CBustOnly(CBurst):
 
         for i in range(len(hit_flag)):
             if not hit_flag[i]:
-                self.blocks.append(tag + i)
-                if self.groups_size + len(self.blocks) > BLOCK_NUM:
+                self.blocks[self.buffer_dict[line[1]]].append(tag + i)
+                self.blocks_size += 1
+                if self.groups_size + self.blocks_size > BLOCK_NUM:
                     pop_size = 0
                     flag = False
                     for row in range(LEVEL - 1, -1, -1):
                         while len(self.block_group[row]):
-                            if self.groups_size + len(self.blocks) - pop_size < BLOCK_NUM:
+                            if self.groups_size + self.blocks_size - pop_size < BLOCK_NUM:
                                 flag = True
                                 break
                             pop_size += len(self.block_group[row].pop(0))
@@ -216,16 +220,19 @@ class CBustOnly(CBurst):
                             break
                     self.groups_size -= pop_size
                     if pop_size == 0:
-                        self.blocks.pop(0)
+                        self.blocks[self.buffer_dict[line[1]]].pop(0)
+                        self.blocks_size -= 1
         for i in range(len(hit_flag)):
             if hit_flag[i]:
                 self.hit += 1
             else:
                 self.miss += 1
-
+        # if all(hit_flag):
+        #     self.hit += 1
+        # else:
+        #     self.miss += 1
 
         return all(hit_flag)
-
 
     def run(self):
         if not os.path.exists(self.des_path):
@@ -233,8 +240,9 @@ class CBustOnly(CBurst):
         miss_file = open(self.des_path + "miss.log", "w+")
         file_list = super().fileLists()
         current_lines = ["0" for _ in range(len(file_list))]
+        self.blocks = [[] for _ in range(len(file_list))]
 
-        end_time = 0
+        end_time = [0 for _ in range(len(file_list))]
         start_flag = True
 
         while True:
@@ -262,22 +270,27 @@ class CBustOnly(CBurst):
             line = current_lines[current_line].strip().split(",")
 
             if start_flag:
-                end_time = int(line[0]) + EPOCH
+                end_time[self.buffer_dict[line[1]]] = int(line[0]) + EPOCH
                 start_flag = False
 
-            if int(line[0]) > end_time:
-                if len(self.blocks) > 0:
-                    if self.groups_size + len(self.blocks) > BLOCK_NUM and self.groups_size:
-                        pop_num = int(self.groups_size + len(self.blocks)) - BLOCK_NUM
+            if int(line[0]) > end_time[self.buffer_dict[line[1]]]:
+                if len(self.blocks[self.buffer_dict[line[1]]]) > 0:
+                    if self.groups_size + self.blocks_size > BLOCK_NUM and self.groups_size:
+                        pop_num = int(self.groups_size + self.blocks_size) - BLOCK_NUM
                         for i in range(pop_num):
-                            self.blocks.pop(0)
+                            self.blocks[self.buffer_dict[line[1]]].pop(0)
+                            self.blocks_size -= 1
                         print("boom")
-                    group_index = int(np.log2(len(self.blocks)))
-                    self.groups_size += len(self.blocks)
-                    self.block_group[group_index].append(self.blocks.copy())  # 将当前block_group 加入队列
-                    self.blocks.clear()
+                    for i in range(int(len(self.block_group[0]) / 8)):
+                        self.block_group[0].pop(0)
+                        self.groups_size -= 1
+                    group_index = int(np.log2(len(self.blocks[self.buffer_dict[line[1]]])))
+                    self.groups_size += len(self.blocks[self.buffer_dict[line[1]]])
+                    self.blocks_size -= len(self.blocks[self.buffer_dict[line[1]]])
+                    self.block_group[group_index].append(self.blocks[self.buffer_dict[line[1]]].copy())  # 将当前block_group 加入队列
+                    self.blocks[self.buffer_dict[line[1]]].clear()
 
-                end_time = int(line[0]) + EPOCH  # 处理下一个block_group
+                end_time[self.buffer_dict[line[1]]] = int(line[0]) + EPOCH  # 处理下一个block_group
             hit_flag = self.checkHit(line)
             if not hit_flag:
                 super().saveLog(miss_file, "miss " + current_lines[current_line])
@@ -285,14 +298,14 @@ class CBustOnly(CBurst):
             self.total += 1
             if self.total % 50000 == 0:
                 print(current_lines[current_line], self.miss, self.hit, self.total,
-                      "\naccuracy:", self.hit / (self.hit + self.miss), self.groups_size + len(self.blocks))
+                      "\naccuracy:", self.hit / (self.hit + self.miss), self.groups_size + self.blocks_size)
             current_lines[current_line] = "0"
 
         super().closeFile(file_list)
         miss_file.close()
         with open(self.des_path + "result.log", "w+") as result_log:
             result_log.write("accuracy: " + str(self.hit / (self.miss + self.total)) + "\nhit_num: " + str(self.hit) +
-                            "\nmiss_num: " + str(self.miss) + "\n lines: " + str(self.total) + "\n")
+                             "\nmiss_num: " + str(self.miss) + "\n lines: " + str(self.total) + "\n")
 
 
 class CBustLRU(CBurst):
@@ -313,7 +326,6 @@ class CBustLRU(CBurst):
         self.hit = 0.0
         self.miss = 0.0
         self.total = 0.0
-
 
         self.lru_hit = 0.0  # lru_only var
         self.lru_miss = 0.0
@@ -353,7 +365,6 @@ class CBustLRU(CBurst):
                 if tag + i in self.blocks:
                     hit_flag[i] = True
                     self.addToLRU(tag + i)
-                    self.miss += 1
                 else:
                     self.blocks.append(tag + i)
                     hit_flag[i] = False
@@ -369,8 +380,9 @@ class CBustLRU(CBurst):
                             if flag:
                                 break
                         self.groups_size -= pop_size
-                        if self.groups_size + len(self.blocks) > self.cburst_blocks:  # 如果cburst区域很小了，就需要吧in buffer区域的数据加入lru区域
-                            over_size  = int(self.groups_size + len(self.blocks) - self.cburst_blocks)
+                        if self.groups_size + len(
+                                self.blocks) > self.cburst_blocks:  # 如果cburst区域很小了，就需要吧in buffer区域的数据加入lru区域
+                            over_size = int(self.groups_size + len(self.blocks) - self.cburst_blocks)
                             for i in range(over_size):
                                 if self.cache_tag.__contains__(self.blocks[i]):
                                     t = time.process_time()
@@ -397,7 +409,8 @@ class CBustLRU(CBurst):
                             self.block_group[row][col].remove(tag + i)
                             if len(self.block_group[row][col]) == 0:
                                 remove_list.append(col)
-                            if len(self.block_group[row][col]) > 0 and int(np.log2(len(self.block_group[row][col]))) < row:
+                            if len(self.block_group[row][col]) > 0 and int(
+                                    np.log2(len(self.block_group[row][col]))) < row:
                                 level_down.append(col)
                             self.addToLRU(tag + i)  # 添加到LRU区中
                             self.groups_size -= 1
@@ -442,9 +455,6 @@ class CBustLRU(CBurst):
                     self.lru_cache_tag[tag + i] = t
                     self.lru_cache_index[t] = tag + i
 
-
-
-
     def run(self):
         if not os.path.exists(self.des_path):
             os.makedirs(self.des_path)
@@ -486,7 +496,7 @@ class CBustLRU(CBurst):
             if int(line[0]) > end_time:
                 if len(self.blocks) > 0:
                     if self.groups_size + len(self.blocks) > self.cburst_blocks > self.mesh_size:
-                        pop_num = int(self.groups_size + len(self.blocks)) - BLOCK_NUM
+                        pop_num = int(self.groups_size + len(self.blocks) - self.cburst_blocks)
                         for i in range(pop_num):
                             self.blocks.pop(0)
                         print("boom")
@@ -505,7 +515,8 @@ class CBustLRU(CBurst):
                 super().saveLog(miss_file, "miss " + current_lines[current_line])
             self.total += 1
             if self.total % 5000 == 0:
-                if abs(((self.miss / (self.miss + self.hit)) - (self.lru_miss / (self.lru_miss + self.lru_hit)))) > 0.1 and self.cburst_blocks > self.mesh_size:
+                if abs(((self.miss / (self.miss + self.hit)) - (
+                        self.lru_miss / (self.lru_miss + self.lru_hit)))) > 0.1 and self.cburst_blocks > self.mesh_size:
                     self.lru_blocks += self.mesh_size
                     self.cburst_blocks -= self.mesh_size
                     if self.cburst_blocks < self.groups_size:
@@ -524,7 +535,8 @@ class CBustLRU(CBurst):
                             if flag:
                                 break
                         self.groups_size -= pop_size
-                elif abs(((self.miss / (self.miss + self.hit)) - (self.lru_miss / (self.lru_hit + self.lru_miss)))) < 0.1 and self.lru_blocks > self.mesh_size:
+                elif abs(((self.miss / (self.miss + self.hit)) - (
+                        self.lru_miss / (self.lru_hit + self.lru_miss)))) < 0.1 and self.lru_blocks > self.mesh_size:
                     self.lru_blocks -= self.mesh_size
                     if self.lru_blocks < len(self.cache_tag):
                         pop_num = int(len(self.cache_tag) - self.lru_blocks)
@@ -540,7 +552,8 @@ class CBustLRU(CBurst):
                         self.block_group[index_temp].append(blocks_temp)
                     self.cburst_blocks += self.mesh_size
             if self.total % 10000 == 0:
-                print(current_lines[current_line], self.lru_miss / (self.lru_hit + self.lru_miss), self.miss / (self.hit + self.miss), self.total, "\n",
+                print(current_lines[current_line], self.lru_miss / (self.lru_hit + self.lru_miss),
+                      self.miss / (self.hit + self.miss), self.total, "\n",
                       self.lru_blocks, self.cburst_blocks, "\n",
                       len(self.cache_tag), self.groups_size + len(self.blocks))
             current_lines[current_line] = "0"
@@ -549,11 +562,7 @@ class CBustLRU(CBurst):
         miss_file.close()
         with open(self.des_path + "result.log", "w+") as result_log:
             result_log.write("accuracy: " + str(self.hit / (self.miss + self.total)) + "\nhit_num: " + str(self.hit) +
-                            "\nmiss_num: " + str(self.miss) + "\n lines: " + str(self.total) + "\n")
-
-
-
-
+                             "\nmiss_num: " + str(self.miss) + "\n lines: " + str(self.total) + "\n")
 
 
 if __name__ == '__main__':
@@ -570,5 +579,3 @@ if __name__ == '__main__':
     elif choose == '3':
         test = CBustLRU(SOURCE_PATH, DESTINATION_PATH)
         test.run()
-
-
