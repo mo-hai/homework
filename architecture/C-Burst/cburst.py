@@ -13,7 +13,7 @@ import time
 
 SOURCE_PATH = os.environ['HOME'] + "/data/trace/CBursty/"
 
-DESTINATION_PATH = "log"
+DESTINATION_PATH = "log1"
 
 EPOCH = 10 ** 8
 LEVEL = 16
@@ -109,16 +109,16 @@ class LRUOnly(CBurst):
             hit_flag = True
             for i in range(block_num):  # 命中检测
                 if self.cache_tag.__contains__(tag + i):
-                    self.hit += 1
                     t = time.process_time()
                     index = self.cache_tag[tag + i]
                     self.cache_tag.pop(tag + i)
                     self.cache_index.pop(index)
                     self.cache_index[t] = tag + i
                     self.cache_tag[tag + i] = t
+                    self.hit += 1
                 else:
-                    hit_flag = False
                     self.miss += 1
+                    hit_flag = False
                     if not full_flag and len(self.cache_tag) < BLOCK_NUM:
                         t = time.process_time()
                         self.cache_index[t] = tag + i
@@ -137,10 +137,11 @@ class LRUOnly(CBurst):
                 super().saveLog(w, "miss " + current_lines[current_line])
 
 
+
             self.total += 1
-            if self.total % 10000 == 0:
-                print(current_lines[current_line], self.hit, self.miss, len(self.cache_tag), self.total, "\nmiss rate：",
-                      self.miss / (self.miss + self.hit), time.process_time() - t1)
+            if self.total % 50000 == 0:
+                print(current_lines[current_line], self.hit, self.miss, len(self.cache_tag), self.total, "\naccuracy：",
+                      self.hit / (self.miss + self.hit), time.process_time() - t1)
                 t1 = time.process_time()
             current_lines[current_line] = "0"
 
@@ -173,10 +174,34 @@ class CBustOnly(CBurst):
         for i in range(block_num):  # in_buffer 中寻找
             if tag + i in self.blocks:
                 hit_flag[i] = True
-                self.hit += 1
-            else:
-                self.miss += 1
-                hit_flag[i] = False
+
+        for i in range(block_num):  # 冷块中寻找
+            if not hit_flag[i]:
+                for row in range(LEVEL):
+                    if hit_flag[i]:
+                        break
+                    level_len = len(self.block_group[row])
+                    level_down = []
+                    remove_col = []
+                    for col in range(level_len):
+                        if tag + i in self.block_group[row][col]:
+                            self.block_group[row][col].remove(tag + i)
+                            if len(self.block_group[row][col]) == 0:
+                                remove_col.append(col)
+                            if len(self.block_group[row][col]) > 0 and int(np.log2(len(self.block_group[row][col]))) < row:
+                                level_down.append(col)
+                            self.blocks.append(tag + i)
+                            self.groups_size -= 1
+                            hit_flag[i] = True
+                            break
+                    for i in range(len(level_down)):
+                        temp = self.block_group[row].pop(level_down[i])
+                        self.block_group[row - 1].append(temp)
+                    for i in range(len(remove_col)):
+                        self.block_group[row].pop(remove_col[i])
+
+        for i in range(len(hit_flag)):
+            if not hit_flag[i]:
                 self.blocks.append(tag + i)
                 if self.groups_size + len(self.blocks) > BLOCK_NUM:
                     pop_size = 0
@@ -190,27 +215,14 @@ class CBustOnly(CBurst):
                         if flag:
                             break
                     self.groups_size -= pop_size
+                    if pop_size == 0:
+                        self.blocks.pop(0)
+        for i in range(len(hit_flag)):
+            if hit_flag[i]:
+                self.hit += 1
+            else:
+                self.miss += 1
 
-        for i in range(block_num):  # 冷块中寻找
-            if not hit_flag[i]:
-                for row in range(LEVEL):
-                    if hit_flag[i]:
-                        break
-                    level_len = len(self.block_group[row])
-                    level_down = []
-                    for col in range(level_len):
-                        if tag + i in self.block_group[row][col]:
-                            self.block_group[row][col].remove(tag + i)
-                            if len(self.block_group[row][col]) > 0 and int(np.log2(len(self.block_group[row][col]))) < row:
-                                level_down.append(col)
-                            self.blocks.append(tag + i)
-                            self.groups_size -= 1
-                            hit_flag[i] = True
-                            self.hit += 1
-                            break
-                    for i in range(len(level_down)):
-                        temp = self.block_group[row].pop(level_down[i])
-                        self.block_group[row - 1].append(temp)
 
         return all(hit_flag)
 
@@ -255,9 +267,11 @@ class CBustOnly(CBurst):
 
             if int(line[0]) > end_time:
                 if len(self.blocks) > 0:
-                    if self.groups_size + len(self.blocks) > BLOCK_NUM:
+                    if self.groups_size + len(self.blocks) > BLOCK_NUM and self.groups_size:
+                        pop_num = int(self.groups_size + len(self.blocks)) - BLOCK_NUM
+                        for i in range(pop_num):
+                            self.blocks.pop(0)
                         print("boom")
-                        exit(0)
                     group_index = int(np.log2(len(self.blocks)))
                     self.groups_size += len(self.blocks)
                     self.block_group[group_index].append(self.blocks.copy())  # 将当前block_group 加入队列
@@ -339,6 +353,7 @@ class CBustLRU(CBurst):
                 if tag + i in self.blocks:
                     hit_flag[i] = True
                     self.addToLRU(tag + i)
+                    self.miss += 1
                 else:
                     self.blocks.append(tag + i)
                     hit_flag[i] = False
@@ -376,18 +391,24 @@ class CBustLRU(CBurst):
                         break
                     level_len = len(self.block_group[row])
                     level_down = []
+                    remove_list = []
                     for col in range(level_len):
                         if tag + i in self.block_group[row][col]:
                             self.block_group[row][col].remove(tag + i)
+                            if len(self.block_group[row][col]) == 0:
+                                remove_list.append(col)
                             if len(self.block_group[row][col]) > 0 and int(np.log2(len(self.block_group[row][col]))) < row:
                                 level_down.append(col)
                             self.addToLRU(tag + i)  # 添加到LRU区中
                             self.groups_size -= 1
                             hit_flag[i] = True
                             break
+                    for i in range(len(remove_list)):
+                        self.block_group[row].pop(remove_list[i])
                     for i in range(len(level_down)):
                         temp = self.block_group[row].pop(level_down[i])
                         self.block_group[row - 1].append(temp)
+
         for i in range(len(hit_flag)):
             if hit_flag[i]:
                 self.hit += 1
@@ -397,7 +418,6 @@ class CBustLRU(CBurst):
 
     def LRUOnly(self, line):
         tag, block_num = super().getBlockTag(line[4], line[5])
-        hit_flag = True
         for i in range(block_num):  # 命中检测
             if self.lru_cache_tag.__contains__(tag + i):
                 self.lru_hit += 1
@@ -408,7 +428,6 @@ class CBustLRU(CBurst):
                 self.lru_cache_index[t] = tag + i
                 self.lru_cache_tag[tag + i] = t
             else:
-                hit_flag = False
                 self.lru_miss += 1
                 if len(self.lru_cache_tag) < BLOCK_NUM:
                     t = time.process_time()
@@ -467,8 +486,10 @@ class CBustLRU(CBurst):
             if int(line[0]) > end_time:
                 if len(self.blocks) > 0:
                     if self.groups_size + len(self.blocks) > self.cburst_blocks > self.mesh_size:
+                        pop_num = int(self.groups_size + len(self.blocks)) - BLOCK_NUM
+                        for i in range(pop_num):
+                            self.blocks.pop(0)
                         print("boom")
-                        exit(0)
                     group_index = int(np.log2(len(self.blocks)))
                     self.groups_size += len(self.blocks)
                     if self.groups_size > self.cburst_blocks:
@@ -496,7 +517,10 @@ class CBustLRU(CBurst):
                                 if pop_size >= pop_num:
                                     flag = True
                                     break
-                                pop_size += len(self.block_group[row].pop(0))
+                                block_temp = self.block_group[row].pop(0)
+                                for i in range(len(block_temp)):
+                                    self.addToLRU(block_temp[i])
+                                pop_size += len(block_temp)
                             if flag:
                                 break
                         self.groups_size -= pop_size
@@ -506,11 +530,15 @@ class CBustLRU(CBurst):
                         pop_num = int(len(self.cache_tag) - self.lru_blocks)
                         temp_tag = list(self.cache_tag.keys())
                         temp_index = list(self.cache_index.keys())
+                        blocks_temp = []
                         for i in range(pop_num):
                             if i < len(temp_tag):
                                 self.cache_index.pop(temp_index[i])
                                 self.cache_tag.pop(temp_tag[i])
-                        self.cburst_blocks += self.mesh_size
+                                blocks_temp.append(temp_tag[i])
+                        index_temp = int(np.log2(len(blocks_temp)))
+                        self.block_group[index_temp].append(blocks_temp)
+                    self.cburst_blocks += self.mesh_size
             if self.total % 10000 == 0:
                 print(current_lines[current_line], self.lru_miss / (self.lru_hit + self.lru_miss), self.miss / (self.hit + self.miss), self.total, "\n",
                       self.lru_blocks, self.cburst_blocks, "\n",
