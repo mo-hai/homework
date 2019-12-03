@@ -11,13 +11,15 @@ import os
 import sys
 import time
 
-SOURCE_PATH = os.environ['HOME'] + "/data/trace/CBursty/"
+SOURCE_PATH = os.environ['HOME'] + "/data/trace/cburst1/"
+DESTINATION_PATH = "one_file_log_size = 512"
 
-DESTINATION_PATH = "two_file_log"
+# SOURCE_PATH = os.environ['HOME'] + "/data/trace/CBursty/"
+# DESTINATION_PATH = "two_file_log"
 
 EPOCH = 10 ** 8
 LEVEL = 16
-BLOCK_NUM = 1 << 15
+BLOCK_NUM = 1 << 16
 
 
 class CBurst:
@@ -313,6 +315,7 @@ class CBustLRU(CBurst):
         self.hit = 0.0
         self.miss = 0.0
         self.total = 0.0
+        self.count = 0
 
 
         self.lru_hit = 0.0  # lru_only var
@@ -383,8 +386,7 @@ class CBustLRU(CBurst):
         for i in range(len(hit_flag)):  # 将缺失的块加入in_buffer
             if not hit_flag[i]:
                 self.blocks.append(tag + i)
-                hit_flag[i] = False
-                if self.groups_size + len(self.blocks) > self.cburst_blocks:
+                if int(self.groups_size + len(self.blocks)) > self.cburst_blocks >= self.mesh_size:
                     pop_size = 0
                     flag = False
                     for row in range(LEVEL - 1, -1, -1):
@@ -396,8 +398,7 @@ class CBustLRU(CBurst):
                         if flag:
                             break
                     self.groups_size -= pop_size
-                    if not flag and self.groups_size + len(
-                            self.blocks) > self.cburst_blocks:  # 如果cburst区域很小了，就需要吧in buffer区域的数据加入lru区域
+                    if self.groups_size + len(self.blocks) > self.cburst_blocks:  # 如果cburst区域很小了，就需要吧in buffer区域的数据加入lru区域
                         over_size = int(self.groups_size + len(self.blocks) - self.cburst_blocks)
                         for i in range(over_size):
                             self.addToLRU(self.blocks.pop(0))
@@ -435,7 +436,46 @@ class CBustLRU(CBurst):
                     self.lru_cache_index[t] = tag + i
 
 
-
+    def adjustment(self):
+        if abs(((self.miss / (self.miss + self.hit)) - (
+                self.lru_miss / (self.lru_miss + self.lru_hit)))) > 0.1 and self.cburst_blocks > self.mesh_size:
+            self.lru_blocks += self.mesh_size
+            self.cburst_blocks -= self.mesh_size
+            if self.cburst_blocks < self.groups_size + len(self.blocks):
+                pop_num = int(self.groups_size + len(self.blocks) - self.cburst_blocks)
+                pop_size = 0
+                flag = False
+                for row in range(LEVEL - 1, -1, -1):
+                    while len(self.block_group[row]):
+                        if pop_size >= pop_num:
+                            flag = True
+                            break
+                        block_temp = self.block_group[row].pop(0)
+                        for i in range(len(block_temp)):
+                            self.addToLRU(block_temp[i])
+                        pop_size += len(block_temp)
+                    if flag:
+                        break
+                if self.groups_size == 512:
+                    print(self.groups_size)
+                self.groups_size -= pop_size
+        elif abs(((self.miss / (self.miss + self.hit)) - (
+                self.lru_miss / (self.lru_hit + self.lru_miss)))) < 0.1 and self.lru_blocks > self.mesh_size:
+            self.lru_blocks -= self.mesh_size
+            if self.lru_blocks < len(self.cache_tag):
+                pop_num = int(len(self.cache_tag) - self.lru_blocks)
+                temp_tag = list(self.cache_tag.keys())
+                temp_index = list(self.cache_index.keys())
+                blocks_temp = []
+                for i in range(pop_num):
+                    if i < len(temp_tag):
+                        self.cache_index.pop(temp_index[i])
+                        self.cache_tag.pop(temp_tag[i])
+                        blocks_temp.append(temp_tag[i])
+                index_temp = int(np.log2(len(blocks_temp)))
+                self.block_group[index_temp].append(blocks_temp)
+                self.groups_size += len(blocks_temp)
+            self.cburst_blocks += self.mesh_size
 
     def run(self):
         if not os.path.exists(self.des_path):
@@ -476,65 +516,38 @@ class CBustLRU(CBurst):
                 start_flag = False
 
             if int(line[0]) > end_time:
-                for i in range(len(self.block_group[0]) // 8):
-                    self.block_group[0].pop(0)
-                    self.groups_size -= 1
+                self.count += 1
+                if self.count == 100:
+                    self.count = 0
+                    self.adjustment()
+                    for i in range(len(self.block_group[0]) // 4):
+                        self.block_group[0].pop(0)
+                        self.groups_size -= 1
+                    for i in range(len(self.block_group[1]) // 4):
+                        self.groups_size -= len(self.block_group[1].pop(0))
                 if len(self.blocks) > 0:
-                    if self.groups_size + len(self.blocks) > self.cburst_blocks > self.mesh_size:
-                        pop_num = int(self.groups_size + len(self.blocks) - self.cburst_blocks)
-                        for i in range(pop_num):
+                    group_index = int(np.log2(len(self.blocks)))
+                    self.groups_size += len(self.blocks)
+
+                    if self.groups_size > self.cburst_blocks:
+                        print("groups_size is too big")
+                        over_size = int(self.groups_size + - self.cburst_blocks)
+                        for i in range(over_size):
                             self.addToLRU(self.blocks.pop(0))
-                        print("boom")
+                            self.groups_size -= 1
                     if len(self.blocks) > 0:
-                        group_index = int(np.log2(len(self.blocks)))
-                        self.groups_size += len(self.blocks)
                         if self.groups_size > self.cburst_blocks:
-                            print("groups_size is too big")
+                            print("error")
                             exit(0)
                         self.block_group[group_index].append(self.blocks.copy())  # 将当前block_group 加入队列
                         self.blocks.clear()
 
+
             hit_flag = self.checkHit(line)
             self.LRUOnly(line)
-
             if not hit_flag:
                 super().saveLog(miss_file, "miss " + current_lines[current_line])
             self.total += 1
-            if self.total % 5000 == 0:
-                if abs(((self.miss / (self.miss + self.hit)) - (self.lru_miss / (self.lru_miss + self.lru_hit)))) > 0.1 and self.cburst_blocks > self.mesh_size:
-                    self.lru_blocks += self.mesh_size
-                    self.cburst_blocks -= self.mesh_size
-                    if self.cburst_blocks < self.groups_size:
-                        pop_num = int(self.groups_size - self.cburst_blocks)
-                        pop_size = 0
-                        flag = False
-                        for row in range(LEVEL - 1, -1, -1):
-                            while len(self.block_group[row]):
-                                if pop_size >= pop_num:
-                                    flag = True
-                                    break
-                                block_temp = self.block_group[row].pop(0)
-                                for i in range(len(block_temp)):
-                                    self.addToLRU(block_temp[i])
-                                pop_size += len(block_temp)
-                            if flag:
-                                break
-                        self.groups_size -= (pop_size - pop_num)
-                elif abs(((self.miss / (self.miss + self.hit)) - (self.lru_miss / (self.lru_hit + self.lru_miss)))) < 0.1 and self.lru_blocks > self.mesh_size:
-                    self.lru_blocks -= self.mesh_size
-                    if self.lru_blocks < len(self.cache_tag):
-                        pop_num = int(len(self.cache_tag) - self.lru_blocks)
-                        temp_tag = list(self.cache_tag.keys())
-                        temp_index = list(self.cache_index.keys())
-                        blocks_temp = []
-                        for i in range(pop_num):
-                            if i < len(temp_tag):
-                                self.cache_index.pop(temp_index[i])
-                                self.cache_tag.pop(temp_tag[i])
-                                blocks_temp.append(temp_tag[i])
-                        index_temp = int(np.log2(len(blocks_temp)))
-                        self.block_group[index_temp].append(blocks_temp)
-                    self.cburst_blocks += self.mesh_size
             if self.total % 10000 == 0:
                 print(current_lines[current_line], self.lru_miss / (self.lru_hit + self.lru_miss), self.miss / (self.hit + self.miss), self.total, "\n",
                       self.lru_blocks, self.cburst_blocks, "\n",
