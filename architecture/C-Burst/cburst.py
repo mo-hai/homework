@@ -13,7 +13,7 @@ import time
 
 SOURCE_PATH = os.environ['HOME'] + "/data/trace/CBursty/"
 
-DESTINATION_PATH = "one_file_log"
+DESTINATION_PATH = "two_file_log"
 
 EPOCH = 10 ** 8
 LEVEL = 16
@@ -483,16 +483,16 @@ class CBustLRU(CBurst):
                     if self.groups_size + len(self.blocks) > self.cburst_blocks > self.mesh_size:
                         pop_num = int(self.groups_size + len(self.blocks) - self.cburst_blocks)
                         for i in range(pop_num):
-                            if len(self.blocks) > 1 :
-                                self.blocks.pop(0)
+                            self.addToLRU(self.blocks.pop(0))
                         print("boom")
-                    group_index = int(np.log2(len(self.blocks)))
-                    self.groups_size += len(self.blocks)
-                    if self.groups_size > self.cburst_blocks:
-                        print("error")
-                        exit(0)
-                    self.block_group[group_index].append(self.blocks.copy())  # 将当前block_group 加入队列
-                    self.blocks.clear()
+                    if len(self.blocks) > 0:
+                        group_index = int(np.log2(len(self.blocks)))
+                        self.groups_size += len(self.blocks)
+                        if self.groups_size > self.cburst_blocks:
+                            print("groups_size is too big")
+                            exit(0)
+                        self.block_group[group_index].append(self.blocks.copy())  # 将当前block_group 加入队列
+                        self.blocks.clear()
 
             hit_flag = self.checkHit(line)
             self.LRUOnly(line)
