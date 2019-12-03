@@ -13,7 +13,7 @@ import time
 
 SOURCE_PATH = os.environ['HOME'] + "/data/trace/CBursty/"
 
-DESTINATION_PATH = "log1"
+DESTINATION_PATH = "one_file_log"
 
 EPOCH = 10 ** 8
 LEVEL = 16
@@ -150,7 +150,7 @@ class LRUOnly(CBurst):
         print(self.hit / (self.miss + self.hit))
         print(self.hit, self.total)
         with open(self.des_path + "result.log", "w+") as result_log:
-            result_log.write("accuracy: " + str(self.hit / (self.miss + self.total)) + "\nhit_num: " + str(self.hit) +
+            result_log.write("accuracy: " + str(self.hit / (self.miss + self.hit)) + "\nhit_num: " + str(self.hit) +
                             "\nmiss_num: " + str(self.miss) + "\n lines: " + str(self.total) + "\n")
 
 
@@ -291,7 +291,7 @@ class CBustOnly(CBurst):
         super().closeFile(file_list)
         miss_file.close()
         with open(self.des_path + "result.log", "w+") as result_log:
-            result_log.write("accuracy: " + str(self.hit / (self.miss + self.total)) + "\nhit_num: " + str(self.hit) +
+            result_log.write("accuracy: " + str(self.hit / (self.miss + self.hit)) + "\nhit_num: " + str(self.hit) +
                             "\nmiss_num: " + str(self.miss) + "\n lines: " + str(self.total) + "\n")
 
 
@@ -353,36 +353,7 @@ class CBustLRU(CBurst):
                 if tag + i in self.blocks:
                     hit_flag[i] = True
                     self.addToLRU(tag + i)
-                    self.miss += 1
-                else:
-                    self.blocks.append(tag + i)
-                    hit_flag[i] = False
-                    if self.groups_size + len(self.blocks) > self.cburst_blocks:
-                        pop_size = 0
-                        flag = False
-                        for row in range(LEVEL - 1, -1, -1):
-                            while len(self.block_group[row]):
-                                if self.groups_size + len(self.blocks) - pop_size < self.cburst_blocks:
-                                    flag = True
-                                    break
-                                pop_size += len(self.block_group[row].pop(0))
-                            if flag:
-                                break
-                        self.groups_size -= pop_size
-                        if self.groups_size + len(self.blocks) > self.cburst_blocks:  # 如果cburst区域很小了，就需要吧in buffer区域的数据加入lru区域
-                            over_size  = int(self.groups_size + len(self.blocks) - self.cburst_blocks)
-                            for i in range(over_size):
-                                if self.cache_tag.__contains__(self.blocks[i]):
-                                    t = time.process_time()
-                                    index = self.cache_tag[self.blocks[i]]
-                                    self.cache_tag.pop(self.blocks[i])
-                                    self.cache_index.pop(index)
-                                    self.cache_index[t] = self.blocks[i]
-                                    self.cache_tag[self.blocks[i]] = t
-                                else:
-                                    self.addToLRU(self.blocks[i])
-                            for i in range(over_size):
-                                self.blocks.pop(0)
+
 
         for i in range(block_num):  # 冷块中寻找
             if not hit_flag[i]:
@@ -409,6 +380,27 @@ class CBustLRU(CBurst):
                         temp = self.block_group[row].pop(level_down[i])
                         self.block_group[row - 1].append(temp)
 
+        for i in range(len(hit_flag)):  # 将缺失的块加入in_buffer
+            if not hit_flag[i]:
+                self.blocks.append(tag + i)
+                hit_flag[i] = False
+                if self.groups_size + len(self.blocks) > self.cburst_blocks:
+                    pop_size = 0
+                    flag = False
+                    for row in range(LEVEL - 1, -1, -1):
+                        while len(self.block_group[row]):
+                            if self.groups_size + len(self.blocks) - pop_size < self.cburst_blocks:
+                                flag = True
+                                break
+                            pop_size += len(self.block_group[row].pop(0))
+                        if flag:
+                            break
+                    self.groups_size -= pop_size
+                    if not flag and self.groups_size + len(
+                            self.blocks) > self.cburst_blocks:  # 如果cburst区域很小了，就需要吧in buffer区域的数据加入lru区域
+                        over_size = int(self.groups_size + len(self.blocks) - self.cburst_blocks)
+                        for i in range(over_size):
+                            self.addToLRU(self.blocks.pop(0))
         for i in range(len(hit_flag)):
             if hit_flag[i]:
                 self.hit += 1
@@ -484,11 +476,15 @@ class CBustLRU(CBurst):
                 start_flag = False
 
             if int(line[0]) > end_time:
+                for i in range(len(self.block_group[0]) // 8):
+                    self.block_group[0].pop(0)
+                    self.groups_size -= 1
                 if len(self.blocks) > 0:
                     if self.groups_size + len(self.blocks) > self.cburst_blocks > self.mesh_size:
-                        pop_num = int(self.groups_size + len(self.blocks)) - BLOCK_NUM
+                        pop_num = int(self.groups_size + len(self.blocks) - self.cburst_blocks)
                         for i in range(pop_num):
-                            self.blocks.pop(0)
+                            if len(self.blocks) > 1 :
+                                self.blocks.pop(0)
                         print("boom")
                     group_index = int(np.log2(len(self.blocks)))
                     self.groups_size += len(self.blocks)
@@ -523,7 +519,7 @@ class CBustLRU(CBurst):
                                 pop_size += len(block_temp)
                             if flag:
                                 break
-                        self.groups_size -= pop_size
+                        self.groups_size -= (pop_size - pop_num)
                 elif abs(((self.miss / (self.miss + self.hit)) - (self.lru_miss / (self.lru_hit + self.lru_miss)))) < 0.1 and self.lru_blocks > self.mesh_size:
                     self.lru_blocks -= self.mesh_size
                     if self.lru_blocks < len(self.cache_tag):
@@ -548,7 +544,7 @@ class CBustLRU(CBurst):
         super().closeFile(file_list)
         miss_file.close()
         with open(self.des_path + "result.log", "w+") as result_log:
-            result_log.write("accuracy: " + str(self.hit / (self.miss + self.total)) + "\nhit_num: " + str(self.hit) +
+            result_log.write("accuracy: " + str(self.hit / (self.miss + self.hit)) + "\nhit_num: " + str(self.hit) +
                             "\nmiss_num: " + str(self.miss) + "\n lines: " + str(self.total) + "\n")
 
 
