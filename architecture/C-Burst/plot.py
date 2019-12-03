@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 INTERVAL = 2e8
 def main():
-    fr = open("log1/LRU/miss.log",'r')
+    fr = open("log2/CBurst/miss.log",'r')
     line = fr.readline()
     if line == '' or line == None :
             return
