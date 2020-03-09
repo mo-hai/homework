@@ -20,14 +20,16 @@
 |     1001     |  9   |    0    |
 |    others    |  -   |    -    |
 
-| BA/DC |  00  |  01  |  11  |  10  |
+| DC/AB |  00  |  01  |  11  |  10  |
 | :---: | :--: | :--: | :--: | :--: |
 |  00   |  0   |  0   |  0   |  0   |
 |  01   |  0   |  1   |  0   |  1   |
 |  11   |  X   |  X   |  X   |  X   |
 |  10   |  0   |  0   |  X   |  X   |
 
-![6-15 4564](https://homework-image.oss-cn-beijing.aliyuncs.com/image/6-15 4564.png)
+卡诺图如下所示
+
+![6-15-546456](https://homework-image.oss-cn-beijing.aliyuncs.com/image/6-15-546456.png)
 
 电路图如下所示
 
@@ -41,7 +43,7 @@
 
 简化后的电路如下图所示
 
-![6-44 13214654](https://homework-image.oss-cn-beijing.aliyuncs.com/image/6-44 13214654.png)
+![6-44-4564789](https://homework-image.oss-cn-beijing.aliyuncs.com/image/6-44-4564789.png)
 
 
 
@@ -361,7 +363,7 @@ end test ; -- test
 
 前40ns，a输入为0，一直不大于b，所以y输出为0，50ns-80ns，a输入为1，只有在第50ns的时候大于b，输出为1，由图中的结果可知，电路设计符合预期。
 
-![dasdasd ](https://homework-image.oss-cn-beijing.aliyuncs.com/image/dasdasd .png)
+![1583745898](https://homework-image.oss-cn-beijing.aliyuncs.com/image/1583745898.png)
 
 代码如下所示
 
