@@ -10,7 +10,7 @@
 
 验证程序如下所示
 
-```pyth
+```python
 def lpm(src):
     src = np.array(src)
     n = np.size(src, 0)
